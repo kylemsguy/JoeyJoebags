@@ -2474,21 +2474,22 @@ def main_extract():
         print ('Done!')
 
             
-root= Tk()
-root.geometry("400x300")
-app = Window(root)
-dev = usb.core.find(idVendor=0x046d, idProduct=0x1234)
-if dev is None:
-    messagebox.showinfo("USB Error","I Cant find your hardware! Check the device is plugged in and the USB driver is installed")
-    exit()
-if dev is not None:
-    dev.set_configuration()
-    messagebox.showinfo("Welcome","Gen3 is a work in progress, please report any bugs or requests to Support@Bennvenn.com")
-    main_CheckVersion()
+if __name__ == "__main__":
+    root= Tk()
+    root.geometry("400x300")
+    app = Window(root)
+    dev = usb.core.find(idVendor=0x046d, idProduct=0x1234)
+    if dev is None:
+        messagebox.showinfo("USB Error","I Cant find your hardware! Check the device is plugged in and the USB driver is installed")
+        exit()
+    if dev is not None:
+        dev.set_configuration()
+        messagebox.showinfo("Welcome","Gen3 is a work in progress, please report any bugs or requests to Support@Bennvenn.com")
+        main_CheckVersion()
 
 
-    
-    root.mainloop()
+        
+        root.mainloop()
 
 
 

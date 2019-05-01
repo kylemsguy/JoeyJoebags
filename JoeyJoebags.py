@@ -1,6 +1,9 @@
 from tkinter import *
 from tkinter.filedialog import askopenfilename, asksaveasfilename
+from tkinter.simpledialog import *
+import tkinter.simpledialog as simpledialog
 import tkinter.messagebox as messagebox
+import string
 
 import usb.core
 import usb.util
@@ -32,7 +35,9 @@ class Window(Frame):
         self.init_window()
 
     def init_window(self):
-        self.master.title("Joey Joebags by BennVenn - V3.18")
+
+    
+        self.master.title("Joey Joebags by BennVenn - V3.35")
         self.pack(fill=BOTH, expand=1)
 
         self.lowerLeftLabel = StringVar()
@@ -40,7 +45,7 @@ class Window(Frame):
         cartSelectionLabel.place(x=0,y=280)
         self.lowerRightLabel = StringVar()
         hardwareStatusLabel = Label(root,  textvariable = self.lowerRightLabel)
-        hardwareStatusLabel.place(x=270,y=280)
+        hardwareStatusLabel.place(x=0,y=260)
 
         self.ROMtitleLabel = StringVar()
         ROMtitleLabel = Label(root,  textvariable = self.ROMtitleLabel)
@@ -86,10 +91,11 @@ class Window(Frame):
 #EMS32 Cart Menu
         EMS32menu = Menu(menu)
         cartTypeMenu.add_cascade(label="EMS32",menu=EMS32menu)
-        EMS32menu.add_command(label='Get Save RAM')
-        EMS32menu.add_command(label='Write Save RAM')
-        EMS32menu.add_command(label='Dump ROM')
-        EMS32menu.add_command(label='Flash ROM')
+        EMS32menu.add_command(label='Get Save RAM',command=main_MBC_Dump_256RAM)
+                              
+        EMS32menu.add_command(label='Write Save RAM',command=main_MBC_Burn_RAM)
+        EMS32menu.add_command(label='Dump ROM',command=main_MBC_Dump_ROM)
+        EMS32menu.add_command(label='Flash ROM',command=main_EMS64_Burn_ROM)
 
 #EMS64 Cart Menu
         EMS64menu = Menu(menu)
@@ -205,6 +211,13 @@ class Window(Frame):
         BV256B4.add_command(label='Dump ROM',command=main_BV64_Dump_ROM3)
         BV256B4.add_command(label='Flash ROM',command=main_BV64_Flash_ROM3)
 
+#32k cart menu
+        CatMenu = Menu(menu)
+        cartTypeMenu.add_cascade(label="Catskull 32k",menu=CatMenu)
+        CatMenu.add_command(label='Erase',command=main_Catskull_erase)
+        CatMenu.add_command(label='Flash',command=main_Catskull_write)
+        
+
 #Bung32 Cart Menu
         Bung32menu = Menu(menu)
         cartTypeMenu.add_cascade(label="Bung 32M",menu=Bung32menu,state=DISABLED)
@@ -262,14 +275,16 @@ class Window(Frame):
         cartTypeMenu.add_cascade(label="Chinese BV5 Clone Cart",menu=BV5menu)
         BV5menu.add_command(label='Erase',command=main_BV5_Erase)
         BV5menu.add_command(label='Flash ROM',command=main_BV5_Write)
-#V5 Cheapo Cart Menu
-        V5menu = Menu(menu)
-        cartTypeMenu.add_cascade(label="Chinese _BV5 Clone Cart NoMod",menu=V5menu)
-        V5menu.add_command(label='Erase',command=main_V5_Erase)
-        V5menu.add_command(label='Flash ROM',command=main_V5_Write)
-
+        BV5menu.add_command(label='DRV cart',command=main_luigi_Write)
+        BV5menu.add_command(label='DRV cart Type2',command=main_luigi2_Write)
         cartTypeMenu.add_separator()
 
+#Debug Testing
+        TESTmenu = Menu(menu)
+        cartTypeMenu.add_cascade(label="Debug Mode Testing - Will erase your cart!",menu=TESTmenu)
+        TESTmenu.add_command(label='Test1',command=Test1)
+        TESTmenu.add_command(label='Test2',command=Test2)
+        cartTypeMenu.add_separator()
 
 
 #GBA stuff
@@ -298,10 +313,14 @@ class Window(Frame):
         GBA_ROM_Size.add_command(label='32mbit',command=main_GBA_Dump_32)
         GBA_ROM_Size.add_command(label='64mbit',command=main_GBA_Dump_64)
         GBA_ROM_Size.add_command(label='128mbit',command=main_GBA_Dump_128)
+        GBA_ROM_Size.add_command(label='256mbit',command=main_GBA_Dump_256)
         GBA_BV=Menu(menu)
         cartTypeMenu.add_cascade(label="GBA BennVenn128M",menu=GBA_BV)
         GBA_BV.add_command(label='Flash ROM',command=main_GBA_Flash_ROM)
         #GBA_BV.add_command(label='Testcode',command=main_GBA_Testcode)
+        GBA_DD=Menu(menu)
+        cartTypeMenu.add_cascade(label="GBA 4400 clone cart",menu=GBA_DD)
+        GBA_DD.add_command(label='Flash ROM',command=main_GBA_Flash_ROM_DD)
         
 
         functionMenu = Menu(menu)
@@ -311,7 +330,12 @@ class Window(Frame):
 
         joeyMenu = Menu(menu)
         menu.add_cascade(label="Joey", menu=joeyMenu)
+        joeyMenu.add_command(label="Enter Update Key",command=main_SendKey)
         joeyMenu.add_command(label="Update Firmware",command=main_updateFirmware)
+        joeyMenu.add_command(label="Update Firmware (Legacy)",command=main_updateFirmwareLegacy)
+        
+
+
         joeyMenu.add_separator()
 
         self.lowerRightLabel.set('Hardware Not Detected')
@@ -377,6 +401,18 @@ def main_LoadROM():
         return(1)
     return(0)
 
+def main_LoadROMGBA():
+    global ROMsize
+    global ROMbuffer
+    ROMfileName=askopenfilename(defaultextension=".GBA",filetypes=(("GBA ROM File","*.GBA"),("GBC ROM File","*.GBC"),("GB ROM File","*.GB"),("All Files","*.*")))
+    if ROMfileName:
+        ROMfile=open(ROMfileName,'rb')
+        ROMbuffer=ROMfile.read()
+        ROMsize=len(ROMbuffer)
+        ROMfile.close()
+        return(1)
+    return(0)
+
 def main_SaveROM():
     global ROMsize
     global ROMbuffer
@@ -408,7 +444,31 @@ def main_SaveRAM():
         RAMfile.write(RAMbuffer)
         RAMfile.close()
 
+ 
+
 def main_updateFirmware():
+    A=Get_Key_State()   
+    if A==1:
+        FWfileName=askopenfilename(filetypes=(("BennVenn Firmware File","*.BEN"),("All Files","*.*")))
+        if FWfileName:
+            FWfile=open(FWfileName,'rb')
+            FWbuffer=FWfile.read()
+            FWsize=len(FWbuffer)
+            if FWsize==33280:
+                dev.write(0x01,[0x03])
+                USBbuffer = dev.read(0x81,64)
+                app.lowerRightLabel.set(("File Size Correct"))
+                for FWpos in range (512,33279,64):
+                    dev.write(0x01,FWbuffer[FWpos:FWpos+64])
+            else:
+                app.lowerRightLabel.set(("File Invalid"))
+            FWfile.close()
+            exit()
+    if A==0:
+        messagebox.showinfo('Error','Please enter Key before updating firmware')
+
+
+def main_updateFirmwareLegacy():
     FWfileName=askopenfilename(filetypes=(("BennVenn Firmware File","*.BEN"),("All Files","*.*")))
     if FWfileName:
         FWfile=open(FWfileName,'rb')
@@ -424,13 +484,15 @@ def main_updateFirmware():
             app.lowerRightLabel.set(("File Invalid"))
         FWfile.close()
         exit()
+        
 def main_CheckVersion():
     dev.write(0x01,Command_Get_Version)
     dat = dev.read(0x81,64)
     sdat=""
     for x in range(5):
         sdat=sdat+chr(dat[x])
-    app.lowerRightLabel.set(("Firmware "+sdat))
+    D=(SDID_Read())
+    app.lowerRightLabel.set(("Firmware "+sdat+ " Device ID: "+ D))
 
 
 
@@ -451,6 +513,8 @@ def main_MBC_Dump_RAM():
     global BankSize
     BankSize=16384 #bytes per bank
     main_readCartHeader()
+    dev.write(0x01,[0x0A,0x00,0x01,0x60,0x00,0x01]) #If MBC1, set mode to max RAM
+    USBbuffer = dev.read(0x81,64)
     main_dumpRAM()
     main_SaveRAM()
 
@@ -477,6 +541,8 @@ def main_MBC_Burn_RAM():
     global BankSize
     BankSize=16384 #bytes per bank
     main_readCartHeader()
+    dev.write(0x01,[0x0A,0x00,0x01,0x60,0x00,0x01]) #If MBC1, set mode to max RAM
+    USBbuffer = dev.read(0x81,64)
     if main_LoadRAM() == 1:
         main_BurnRAM()
 
@@ -488,6 +554,12 @@ def main_MBC2_Burn_RAM():
     if main_LoadRAM() == 1:
         main_BurnRAM2()
     
+
+
+
+
+
+
 
 #BV64 Specific Code Goes here:
 def main_BV64_Dump_ROM(ROMBlk):
@@ -1265,6 +1337,10 @@ def main_GBA_Dump_128():
     global ROMsize
     ROMsize=1048576*16
     main_GBA_Dump()
+def main_GBA_Dump_256():
+    global ROMsize
+    ROMsize=1048576*32
+    main_GBA_Dump()
 
 def main_GBA_GetByte(Address):
     Lo=Address&0xFF
@@ -1358,7 +1434,7 @@ def main_GBA_Sector_Erase(Sector):
 def main_GBA_Flash_ROM():
 #Test for BV Flash Cart
     if main_GBA_Read_CFI()==1:
-        main_LoadROM()
+        main_LoadROMGBA()
         Hi2=0
 
         secta=(int(ROMsize/65536))+1
@@ -1408,8 +1484,13 @@ def main_GBA_Testcode():
     dev.write(0x01,[0x30,0x00,0x00,0x00,0x00])
     ROMbuffer= dev.read(0x81,64)
     print (ROMbuffer)    
-    dev.write(0x01,[0x31,0x03,  0x00,0x05,0x55,0x00,0xA9,0x00,0x02,0xAA,0x00,0x56,0x00,0x05,0x55,0x00,0x88])
+    dev.write(0x01,[0x31,0x02,  0x00,0x00,0x00,0x00,0x60, 0x00,0x00,0x00,0x00,0xD0])
     ROMbuffer= dev.read(0x81,64)
+    dev.write(0x01,[0x31,0x02,  0x00,0x00,0x00,0x00,0x20, 0x00,0x00,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    dev.write(0x01,[0x31,0x02,  0x00,0x00,0x00,0x02,0x40, 0x00,0x00,0x00,0x02,0x00])
+    ROMbuffer= dev.read(0x81,64)
+    
     dev.write(0x01,[0x30,0x00,0x00,0x00,0x00])
     ROMbuffer= dev.read(0x81,64)
     print (ROMbuffer)
@@ -1651,67 +1732,36 @@ def main_GBA_Write64kFLASHRAM():
         print ('Done!')
 
 
+
+
+
+
+
 def main_BV5_Erase():
-    main_ROMBankSwitch(0)
     print ("Erasing...")
+    main_EMS64_PageSwap()
     dev.write(0x01,[0x0A,0x01,0x06,0x0A,0xAA,0xA9,0x05,0x55,0x56,0x0A,0xAA,0x80,0x0A,0xAA,0xA9,0x05,0x55,0x56,0x0A,0xAA,0x10])
     RAMbuffer= dev.read(0x81,64)
     while main_ELCheapo_Read(0)[0]!=0xFF:
         print(main_ELCheapo_Read(0))
         pass
     print ("Erased")
-
-
-def main_BV5_Write():
-    
-    main_LoadROM()
-    print('Writing ROM Data') 
-    main_BV5_Erase()
-    ROMpos=0
-    waitcount=0
-    for BankNumber in range (0,int((ROMsize/16384))):
-        main_ROMBankSwitch(BankNumber) #Set the bank
-        print ( BankNumber*16384, ' of ' ,ROMsize)
-        for ROMAddress in range (0x4000,0x8000,32):
-#            if BankNumber==0:
-#                ROMAddress=ROMAddress-0x4000
-            AddHi=ROMAddress>>8
-            AddLo=ROMAddress&0xFF
-            Data32Bytes=ROMbuffer[ROMpos:ROMpos+32]
-            
-            #byte by byte write, its slow....
-
-            AddHi=AddHi.to_bytes(1,'little')
-            AddLo=AddLo.to_bytes(1,'little')
-
-            FlashWriteCommand=b'\x26\x00'+AddHi+AddLo
-            USBoutputPacket = FlashWriteCommand+Data32Bytes
-            dev.write(0x01,USBoutputPacket)
-            USBbuffer = dev.read(0x81,64)
-
-            ROMpos+=32
-    app.lowerLeftLabel.set(str(ROMsize)+' Bytes Written' )
-    messagebox.showinfo('Operation Complete','Writing Complete.')
-    #return to read mode - datasheet says write 0xFF to any address
-    main_ROMBankSwitch(0)
-
-
-def main_V5_Erase():
-    main_ROMBankSwitch(0)
+def main_BV5_EraseSector():
     print ("Erasing...")
-    dev.write(0x01,[0x0A,0x00,0x06,0x0A,0xAA,0xA9,0x05,0x55,0x56,0x0A,0xAA,0x80,0x0A,0xAA,0xA9,0x05,0x55,0x56,0x0A,0xAA,0x10])
+    main_EMS64_PageSwap()
+    dev.write(0x01,[0x0A,0x01,0x06,0x0A,0xAA,0xA9,0x05,0x55,0x56,0x0A,0xAA,0x80,0x0A,0xAA,0xA9,0x05,0x55,0x56,0x0A,0xAA,0x30])
     RAMbuffer= dev.read(0x81,64)
     while main_ELCheapo_Read(0)[0]!=0xFF:
         print(main_ELCheapo_Read(0))
         pass
     print ("Erased")
 
-
-def main_V5_Write():
-    
+def main_BV5_Write():
+    main_EMS64_PageSwap()
     main_LoadROM()
     print('Writing ROM Data') 
-    main_V5_Erase()
+    main_BV5_EraseSector()
+    main_EMS64_PageSwap()
     ROMpos=0
     waitcount=0
     for BankNumber in range (0,int((ROMsize/16384))):
@@ -1729,7 +1779,7 @@ def main_V5_Write():
             AddHi=AddHi.to_bytes(1,'little')
             AddLo=AddLo.to_bytes(1,'little')
 
-            FlashWriteCommand=b'\x27\x00'+AddHi+AddLo
+            FlashWriteCommand=b'\x29\x01'+AddHi+AddLo
             USBoutputPacket = FlashWriteCommand+Data32Bytes
             dev.write(0x01,USBoutputPacket)
             USBbuffer = dev.read(0x81,64)
@@ -1743,12 +1793,14 @@ def main_V5_Write():
 
 
 
+
 def main_ELCheapo_Erase():
     print ("Erasing...")
+    main_ROMBankSwitch(0);
     dev.write(0x01,[0x0A,0x01,0x06,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x0A,0xAA,0x80,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x0A,0xAA,0x10])
     RAMbuffer= dev.read(0x81,64)
     while main_ELCheapo_Read(0)[0]!=0xFF:
-        
+        print (main_ELCheapo_Read(0));
         pass
     print ("Erased")
  
@@ -1758,7 +1810,6 @@ def main_ELCheapo_Read(Address):
     dev.write(0x01,[0x10,0x00,0x00,AddHi,AddLo])
     ROMbuffer= dev.read(0x81,64)
     return (ROMbuffer)
-
 
 def main_ELCheapo_Write():
     
@@ -1825,51 +1876,13 @@ def main_ELCheapoSD_Write():
 
     dev.write(0x01,[0x0A,0x00,0x01,0x00,0x00,0x05]) # Enable WE and SPI
     USBbuffer = dev.read(0x81,64)
-
-
-    main_ROMBankSwitch(0)
-    dev.write(0x01,[0x0A,0x00,0x06,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x0A,0xAA,0x80,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x40,0x00,0x30])
-    RAMbuffer= dev.read(0x81,64)
-    count = 0
-    while main_ELCheapo_Read(0)[0]!=0xFF:
-        count=count+1
-        if count==5000:
-            print("Failed Erase Blk 0")
-            break
-        pass
-    print ("Erased0")    
    
-    dev.write(0x01,[0x0A,0x00,0x06,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x0A,0xAA,0x80,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x60,0x00,0x30])
+    dev.write(0x01,[0x0A,0x00,0x06,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x0A,0xAA,0x80,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x00,0x00,0x30])
     RAMbuffer= dev.read(0x81,64)
     while main_ELCheapo_Read(0)[0]!=0xFF:
-        count=count+1
-        if count==5000:
-            print("Failed Erase Blk 1")
-            break
         pass
-    print ("Erased1")
-    
-    main_ROMBankSwitch(1)
-    dev.write(0x01,[0x0A,0x00,0x06,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x0A,0xAA,0x80,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x40,0x00,0x30])
-    RAMbuffer= dev.read(0x81,64)
-    while main_ELCheapo_Read(0)[0]!=0xFF:
-        count=count+1
-        if count==5000:
-            print("Failed Erase Blk 3")
-            break
-        pass
-    print ("Erased3")
- 
-    dev.write(0x01,[0x0A,0x00,0x06,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x0A,0xAA,0x80,0x0A,0xAA,0xAA,0x05,0x55,0x55,0x60,0x00,0x30])
-    RAMbuffer= dev.read(0x81,64)
-    while main_ELCheapo_Read(0)[0]!=0xFF:
-        count=count+1
-        if count==5000:
-            print("Failed Erase Blk 4")
-            break
-        pass
-    print ("Erased4")
- 
+    print ("Erased")    
+
 
 
     ROMpos=0
@@ -1908,50 +1921,6 @@ def main_ELCheapoSD_Write():
     main_ROMBankSwitch(0)
 
 
-def SD_Init():
-    dev.write(0x01,[0x0A,0x00,0x01,0x00,0x00,0x05]) # Map SPI to 0x3000
-    USBbuffer = dev.read(0x81,64)
-
-    for init in range (0,10):
-        dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0xFF]) # Clock out 0xFF
-        USBbuffer = dev.read(0x81,64)
-        dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x03]) # with CS high
-        USBbuffer = dev.read(0x81,64)
-
-    #CMD0
-    dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0x40]) # Clock out 0x40
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x01]) # with CS Low
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0x00]) # Clock out 0x00
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x01]) # with CS Low
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0x00]) # Clock out 0x00
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x01]) # with CS Low
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0x00]) # Clock out 0x00
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x01]) # with CS Low
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0x00]) # Clock out 0x00
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x01]) # with CS Low
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0x95]) # Clock out 0x95
-    USBbuffer = dev.read(0x81,64)
-    dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x01]) # with CS Low
-    USBbuffer = dev.read(0x81,64)
-    #Wait for response
-        
-
-    for wait in range (0,4):
-        dev.write(0x01,[0x0A,0x00,0x01,0x30,0x00,0xFF]) # Clock out 0xFF
-        USBbuffer = dev.read(0x81,64)
-        dev.write(0x01,[0x0A,0x00,0x01,0x10,0x00,0x01]) # with CS Low
-        USBbuffer = dev.read(0x81,64)
-        print(main_ELCheapoSD_Read(0x3000))
 
 
 
@@ -1980,6 +1949,418 @@ def main_GSWrite():
         USBoutputPacket = FlashWriteCommand
         dev.write(0x01,USBoutputPacket)
         USBbuffer = dev.read(0x81,64)
+
+
+def main_Catskull_erase():
+    print ("Erasing...")
+    dev.write(0x01,[0x0A,0x01,0x06,0x55,0x55,0xAA,0x2A,0xAA,0x55,0x55,0x55,0x80,0x55,0x55,0xAA,0x2A,0xAA,0x55,0x55,0x55,0x10])
+    RAMbuffer= dev.read(0x81,64)
+    while main_ELCheapo_Read(0)[0]!=0xFF:
+        pass
+    print ("Erased")
+
+def main_Catskull_write():
+    if main_LoadROM() == 1:
+        main_Catskull_erase()
+        print('Writing ROM Data') 
+        ROMpos=0
+        for ROMAddress in range (0x0000,0x8000,1):
+            AddHi=ROMAddress>>8
+            AddLo=ROMAddress&0xFF
+            Data1Byte=ROMbuffer[ROMpos:ROMpos+1]
+            dev.write(0x01,[0x0A,0x01,0x04,0x55,0x55,0xAA,0x2A,0xAA,0x55,0x55,0x55,0xA0,AddHi,AddLo,Data1Byte[0]])
+            ROMpos+=1
+        messagebox.showinfo('Operation Complete','Writing Complete.')
+    return
+
+def SDID_Read():
+    dev.write(0x01,[0x80]) 
+    USBbuffer = dev.read(0x81,64)
+    A=(USBbuffer[0])+ (USBbuffer[1]<<8) + (USBbuffer[2]<<16) + (USBbuffer[3]<<24)
+    B=(USBbuffer[4]) + (USBbuffer[5]<<8) + (USBbuffer[6]<<16) + (USBbuffer[7]<<24)
+    C=(USBbuffer[8]) + (USBbuffer[9]<<8)+(USBbuffer[10]<<16) + (USBbuffer[11]<<24)
+    D=str(hex(A))+","+str(hex(B))+","+str(hex(C))
+    return ( D)
+
+
+def main_SendKey():
+    myText=simpledialog.askstring("Update" ,"Enter Device Key:")
+
+    if all(c in string.hexdigits for c in myText) == False or  len(myText)!=8:
+        messagebox.showinfo('Error','One or more characters are invalid')
+    else:
+            
+        Key=myText[0:8]
+        B1=int(Key[0:2],16)
+        B2=int(Key[2:4],16)
+        B3=int(Key[4:6],16)
+        B4=int(Key[6:8],16)
+        B1=B1.to_bytes(1,'little')
+        B2=B2.to_bytes(1,'little')
+        B3=B3.to_bytes(1,'little')
+        B4=B4.to_bytes(1,'little')
+        WriteCommand=b'\x81'+B1+B2+B3+B4
+        dev.write(0x01,WriteCommand)    
+        USBbuffer = dev.read(0x81,64)
+    
+        A=Get_Key_State()   
+        if A==0:
+            messagebox.showinfo('Error','Key not a match to Hardware ID')
+        if A==1:
+            messagebox.showinfo('Success','Firmware Update Enabled')
+
+def Get_Key_State():
+    dev.write(0x01,[0x84]) 
+    USBbuffer = dev.read(0x81,64)
+    return(USBbuffer[0])
+
+def SDID_Set():
+    dev.write(0x01,[0x81,0xF0,0x18,0x60,0xE7]) 
+    USBbuffer = dev.read(0x81,64)
+
+def SDID_Readback():
+    dev.write(0x01,[0x82]) 
+    USBbuffer = dev.read(0x81,64)
+    A=(USBbuffer[0])+ (USBbuffer[1]<<8) + (USBbuffer[2]<<16) + (USBbuffer[3]<<24)
+    print (hex(A))    
+
+def GBA_DualDecord_Unlock_All_Blocks():
+    dev.write(0x01,[0x31,0x02,  0x00,0x40,0x00,0x00,0x60,  0x00,0x40,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    A=0
+    while A!=128:
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=dev.read(0x81,64)
+        A=A[0]
+        A=A&0x80
+    
+    dev.write(0x01,[0x31,0x02,  0x00,0x80,0x00,0x00,0x60,  0x00,0x80,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    A=0
+    while A!=128:
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=dev.read(0x81,64)
+        A=A[0]
+        A=A&0x80
+    
+    dev.write(0x01,[0x31,0x02,  0x00,0xC0,0x00,0x00,0x60,  0x00,0xc0,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    A=0
+    while A!=128:
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=dev.read(0x81,64)
+        A=A[0]
+        A=A&0x80
+    
+
+    for ROMaddress in range (0,0x1FFFFFF,0x20000):
+        Address=int(ROMaddress/2)
+        Lo=Address&0xFF
+        Me=(Address&0xFF00) >> 8
+        Hi=(Address&0xFF0000) >> 16
+        Data32Bytes=ROMbuffer[ROMaddress:ROMaddress+32]
+        Hi=Hi.to_bytes(1,'little')
+        Me=Me.to_bytes(1,'little')
+        Lo=Lo.to_bytes(1,'little')
+
+        FlashWriteCommand=b'\x31\x02'+Hi+Me+Lo+b'\x00\x60'+Hi+Me+Lo+b'\x00\xD0'
+        dev.write(0x01,FlashWriteCommand)
+
+def main_GBA_Sector_Erase_DD(Sector):
+    Shi=Sector 
+    Shi=Shi&0xFF
+   
+    dev.write(0x01,[0x31,0x02,  Shi,0x000,0x00,0x00,0x20,  Shi,0x00,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    A=0
+    while A!=128:
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=dev.read(0x81,64)
+        A=A[0]
+        A=A&0x80
+    print ((Sector+1)*131072,'Bytes Erased')        
+
+def main_GBA_SectorFragment_Erase_DD():
+    dev.write(0x01,[0x31,0x02,  0x00,0x40,0x00,0x00,0x20,  0x00,0x40,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    A=0
+    while A!=128:
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=dev.read(0x81,64)
+        A=A[0]
+        A=A&0x80
+
+    dev.write(0x01,[0x31,0x02,  0x00,0x80,0x00,0x00,0x20,  0x00,0x80,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    A=0
+    while A!=128:
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=dev.read(0x81,64)
+        A=A[0]
+        A=A&0x80
+
+    
+    dev.write(0x01,[0x31,0x02,  0x00,0xC0,0x00,0x00,0x20,  0x00,0xC0,0x00,0x00,0xD0])
+    ROMbuffer= dev.read(0x81,64)
+    A=0
+    while A!=128:
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=dev.read(0x81,64)
+        A=A[0]
+        A=A&0x80
+
+    
+
+def main_GBA_Flash_ROM_DD():
+    global ROMbuffer
+    if 1==1:
+        main_LoadROMGBA()
+        Hi2=0
+        GBA_DualDecord_Unlock_All_Blocks()
+        secta=(int(ROMsize/131072))+1
+
+        main_GBA_SectorFragment_Erase_DD()
+        
+        for sectors in range (0,secta):
+            main_GBA_Sector_Erase_DD(sectors)
+        
+        for ROMaddress in range (0,ROMsize,32):
+            Address=int(ROMaddress/2)
+            Lo=Address&0xFF
+            Me=(Address&0xFF00) >> 8
+            Hi=(Address&0xFF0000) >> 16
+            Data64Bytes=ROMbuffer[ROMaddress:ROMaddress+32]
+            Hi=Hi.to_bytes(1,'little')
+            Me=Me.to_bytes(1,'little')
+            Lo=Lo.to_bytes(1,'little')
+
+            FlashWriteCommand=b'\x3E'+Hi+Me+Lo+b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+            USBoutputPacket = FlashWriteCommand+Data64Bytes
+            dev.write(0x01,USBoutputPacket)
+            response=dev.read(0x81,64)
+            if Hi2 != Hi:
+                print (ROMaddress,' bytes of ',ROMsize ,'Written...')
+                Hi2=Hi
+        print (ROMsize,' Written!')
+        messagebox.showinfo('Operation Complete','Writing Complete.')
+        dev.write(0x01,[0x31,0x01,0x00,0x000,0x00,0x00,0xFF])
+        ROMbuffer= dev.read(0x81,64)
+        main_GBA_ReadHeader()
+
+
+
+def TestGBA():
+    
+    for test in range (0,255):
+        comm=int(test)
+
+        dev.write(0x01,[0x31,0x03,  0x00,0x0A,0xAA,0x00,0xA9, 0x00,0x05,0x54,0x00,0x56, comm,0x00,0x00,0x00,0xF0])
+        A=dev.read(0x81,64)
+
+       
+        dev.write(0x01,[0x31,0x06,  0x00,0x0A,0xAA,0x00,0xA9, 0x00,0x05,0x54,0x00,0x56, 0x00,0x0A,0xAA,0x00,0x80,  0x00,0x0A,0xAA,0x00,0xA9, 0x00,0x05,0x54,0x00,0x56, comm,0x00,0x00,0x00,0x30])
+        A=dev.read(0x81,64)
+       
+        dev.write(0x01,[0x30,0x00,0x00,0x00,0x0])
+        A=(dev.read(0x81,64))
+        print (A)
+        
+def Test1():
+    print ("Set bank 0")
+    main_ROMBankSwitch(0)
+    
+    print ("Test 1 - Read 0x20")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x20])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+
+    print ("Test 2 - Enter CFI AA.98")
+    dev.write(0x01,[0x0A,0x00,0x01,0x00,0xAA,0x98]) # Enable WE and SPI
+    USBbuffer = dev.read(0x81,64)
+    
+    print ("Test 3 - Read 0x20")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x20])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+    
+    print ("Test 4 - Enter CFI55.98")
+    dev.write(0x01,[0x0A,0x00,0x01,0x00,0x55,0x98]) # Enable WE and SPI
+    USBbuffer = dev.read(0x81,64)
+    
+    print ("Test 5 - Read 0x20")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x20])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+    
+    print ("Test 6 - Enter CFI 40AA.98")
+    dev.write(0x01,[0x0A,0x01,0x01,0x40,0xAA,0x98]) # Enable WE and SPI
+    USBbuffer = dev.read(0x81,64)
+    
+    print ("Test 7 - Read 0x20")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x20])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+    
+    print ("Test 8 - Enter CFI 4055.98")
+    dev.write(0x01,[0x0A,0x01,0x01,0x40,0x55,0x98]) # Enable WE and SPI
+    USBbuffer = dev.read(0x81,64)
+    
+    print ("Test 9 - Read 0x20")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x20])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+
+
+  #  print ("Test 15 - Read 0x00")
+ #   dev.write(0x01,[0x10,0x00,0x00,0x00,0x00])#start of logo
+  #  dat = dev.read(0x81,64)
+  #  print (dat)
+
+   # print ("Test 16 - Write 0x00")  
+   # dev.write(0x01,[0x0A,0x00,0x04,0x4A,0xAA,0xAA,0x45,0x55,0x55,0x4A,0xAA,0xA0,0x40,0x00,0x00]) # Enable WE and SPI
+   # USBbuffer = dev.read(0x81,64)
+
+   # print ("Test 17 - Read 0x00")
+   # dev.write(0x01,[0x10,0x00,0x00,0x00,0x00])#start of logo
+   # dat = dev.read(0x81,64)
+   # print (dat)  
+    
+
+    
+
+def Test2():
+    print ("Set bank 0")
+    main_ROMBankSwitch(0)
+    
+     
+    print ("Test 4 - Enter CFI55.98")
+    dev.write(0x01,[0x0A,0x00,0x01,0x00,0x55,0x98]) # Enable WE and SPI
+    USBbuffer = dev.read(0x81,64)
+    
+    print ("Test 5 - Read 0x-0")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x00])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+    
+     
+    print ("Test 5 - Read 0x-10")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x10])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+       
+    
+    print ("Test 5 - Read 0x-20")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x20])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+            
+    
+    print ("Test 5 - Read 0x-0")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x30])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+    
+
+    
+    print ("Test 5 - Read 0x-40")
+    dev.write(0x01,[0x10,0x00,0x00,0x00,0x40])#start of logo
+    dat = dev.read(0x81,64)
+    print (dat)
+    
+
+
+def main_luigi_Erase():
+    dev.write(0x01,[0x0A,0x00,0x06, 0x05,0x55,0xA9, 0x02,0xAA,0x56, 0x05,0x55,0x80, 0x05,0x55,0xA9, 0x02,0xAA,0x56,   0x05,0x55,0x10  ])
+    RAMbuffer= dev.read(0x81,64)
+    while main_ELCheapo_Read(0)[0]!=0xFF:
+        print(main_ELCheapo_Read(0))
+        pass
+    print ("Erased")
+
+
+def main_luigi2_Erase():
+    dev.write(0x01,[0x0A,0x00,0x06, 0x0a,0xaa,0xA9, 0x05,0x55,0x56, 0x0a,0xaa,0x80, 0x0a,0xaa,0xA9, 0x05,0x55,0x56,   0x0a,0xaa,0x10  ])
+    RAMbuffer= dev.read(0x81,64)
+    while main_ELCheapo_Read(0)[0]!=0xFF:
+        print(main_ELCheapo_Read(0))
+        pass
+    print ("Erased")
+def main_luigi2_Write():
+    
+
+    main_LoadROM()
+    print('Writing ROM Data') 
+    main_luigi2_Erase()
+
+    ROMpos=0
+    waitcount=0
+    for BankNumber in range (0,int((ROMsize/16384))):
+        main_ROMBankSwitch(BankNumber) #Set the bank
+        print ( BankNumber*16384, ' of ' ,ROMsize)
+        for ROMAddress in range (0x4000,0x8000,32):
+#            if BankNumber==0:
+#                ROMAddress=ROMAddress-0x4000
+            AddHi=ROMAddress>>8
+            AddLo=ROMAddress&0xFF
+            Data32Bytes=ROMbuffer[ROMpos:ROMpos+32]
+            
+            #byte by byte write, its slow....
+
+            AddHi=AddHi.to_bytes(1,'little')
+            AddLo=AddLo.to_bytes(1,'little')
+
+            FlashWriteCommand=b'\x27\x00'+AddHi+AddLo
+            USBoutputPacket = FlashWriteCommand+Data32Bytes
+            dev.write(0x01,USBoutputPacket)
+            USBbuffer = dev.read(0x81,64)
+
+            ROMpos+=32
+    app.lowerLeftLabel.set(str(ROMsize)+' Bytes Written' )
+    messagebox.showinfo('Operation Complete','Writing Complete.')
+    #return to read mode - datasheet says write 0xFF to any address
+    main_ROMBankSwitch(0)
+
+    
+    
+def main_luigi_Write():
+    
+
+    main_LoadROM()
+    print('Writing ROM Data') 
+    main_luigi_Erase()
+
+    ROMpos=0
+    waitcount=0
+    for BankNumber in range (0,int((ROMsize/16384))):
+        main_ROMBankSwitch(BankNumber) #Set the bank
+        print ( BankNumber*16384, ' of ' ,ROMsize)
+        for ROMAddress in range (0x4000,0x8000,32):
+#            if BankNumber==0:
+#                ROMAddress=ROMAddress-0x4000
+            AddHi=ROMAddress>>8
+            AddLo=ROMAddress&0xFF
+            Data32Bytes=ROMbuffer[ROMpos:ROMpos+32]
+            
+            #byte by byte write, its slow....
+
+            AddHi=AddHi.to_bytes(1,'little')
+            AddLo=AddLo.to_bytes(1,'little')
+
+            FlashWriteCommand=b'\x2A\x00'+AddHi+AddLo
+            USBoutputPacket = FlashWriteCommand+Data32Bytes
+            dev.write(0x01,USBoutputPacket)
+            USBbuffer = dev.read(0x81,64)
+
+            ROMpos+=32
+    app.lowerLeftLabel.set(str(ROMsize)+' Bytes Written' )
+    messagebox.showinfo('Operation Complete','Writing Complete.')
+    #return to read mode - datasheet says write 0xFF to any address
+    main_ROMBankSwitch(0)
+
+
+
+
+
             
 root= Tk()
 root.geometry("400x300")
@@ -1989,9 +2370,12 @@ if dev is None:
     messagebox.showinfo("USB Error","I Cant find your hardware! Check the device is plugged in and the USB driver is installed")
     exit()
 if dev is not None:
-    messagebox.showinfo("Welcome","Gen3 is a work in progress, please report any bugs or requests to Bennvenn@hotmail.com")
     dev.set_configuration()
+    messagebox.showinfo("Welcome","Gen3 is a work in progress, please report any bugs or requests to Bennvenn@hotmail.com")
     main_CheckVersion()
+
+
+    
     root.mainloop()
 
 

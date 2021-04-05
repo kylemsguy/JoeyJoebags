@@ -1,6 +1,7 @@
 from .header import GBHeader
 from .common import BV_SetBank, ROMBankSwitch
 
+# MBC code goes here...
 
 def read_cart_header(dev):
     BV_SetBank(dev, 0, 0)
@@ -21,3 +22,24 @@ def read_cart_header(dev):
 
     header_obj = GBHeader(header)
     return header_obj
+
+
+def dump_rom(dev, ROMsize, BankSize, outfile):
+    ROMbuffer = ""
+    num_banks = ROMsize // BankSize
+    for bankNumber in range(num_banks):
+        print('Dumping ROM:', int(bankNumber*BankSize), ' of ', ROMsize)
+        if bankNumber == 0:
+            # get bank 0 from address 0, not setbank(0) and get from high bank...
+            ROMaddress = 0
+        else:
+            ROMaddress = BankSize
+        ROMBankSwitch(dev, bankNumber)  # switch to new bank.
+        packets = int(BankSize/64)
+        for packetNumber in range(packets):
+            AddHi = ROMaddress >> 8
+            AddLo = ROMaddress & 0xFF
+            dev.write(0x01, [0x10, 0x00, 0x00, AddHi, AddLo])
+            ROMbuffer = dev.read(0x81, 64)
+            outfile.write(ROMbuffer)
+            ROMaddress += 64

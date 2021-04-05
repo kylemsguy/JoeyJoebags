@@ -46,5 +46,5 @@ def CheckVersion(dev):
     sdat = ""
     for x in range(5):
         sdat = sdat+chr(dat[x])
-    D = (SDID_Read())
+    D = SDID_Read(dev)
     return sdat, D

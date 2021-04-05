@@ -1,0 +1,2 @@
+class FWUpdateLockedException(Exception):
+    pass

@@ -11,6 +11,7 @@ import usb.util
 #import itertools
 
 from lib.gb.generic import read_cart_header
+from lib.joey.firmware import *
 
 ROMsize = 0
 RAMsize = 0
@@ -387,23 +388,6 @@ class Window(Frame):
         self.MAPPERtypeLabel.set("Mapper: Unknown")
 
 
-def main_Header():
-    global ROMsize
-    global RAMsize
-    Header = ""
-    dev.write(0x01, [0x10, 0x00, 0x00, 0x01, 0x00])  # start of logo
-    dat = dev.read(0x81, 64)
-    Header = dat
-    msg = [0x10, 0x00, 0x00, 0x01, 0x40]
-    dev.write(0x01, msg)
-    dat = dev.read(0x81, 64)
-    Header += dat
-    msg = [0x10, 0x00, 0x00, 0x01, 0x80]
-    dev.write(0x01, msg)
-    dat = dev.read(0x81, 64)
-    Header += dat  # Header contains 0xC0 bytes of header data
-    print("ROM Title: "+str(Header[0x34:0x43]))
-
 
 def main_readCartHeader():
     global ROMsize
@@ -411,11 +395,13 @@ def main_readCartHeader():
 
     # TODO: run this stuff in a background thread
     header = read_cart_header(dev)
+    title = header.get_title()
     ROMsize = header.get_rom_size()
     RAMsize = header.get_ram_size()
 
-    app.ROMtitleLabel.set(f"ROM Title: {ROMsize}")
-    app.ROMsizeLabel.set(f"ROM Size: {RAMsize}")
+    app.ROMtitleLabel.set(f"ROM Title: {title}")
+    app.ROMsizeLabel.set(f"ROM Size: {ROMsize}")
+    app.RAMsizeLabel.set(f"RAM Size: {RAMsize}")
 
 def main_Exit():
     exit()
@@ -488,24 +474,27 @@ def main_SaveRAM():
 
 def main_updateFirmware():
     A = Get_Key_State()
-    if A == 1:
+    if A:
         FWfileName = askopenfilename(filetypes=(
             ("BennVenn Firmware File", "*.BEN"), ("All Files", "*.*")))
         if FWfileName:
-            FWfile = open(FWfileName, 'rb')
-            FWbuffer = FWfile.read()
-            FWsize = len(FWbuffer)
-            if FWsize == 33280:
-                dev.write(0x01, [0x03])
-                USBbuffer = dev.read(0x81, 64)
-                app.lowerRightLabel.set(("File Size Correct"))
-                for FWpos in range(512, 33279, 64):
-                    dev.write(0x01, FWbuffer[FWpos:FWpos+64])
-            else:
-                app.lowerRightLabel.set(("File Invalid"))
-            FWfile.close()
+            with open(FWfileName, 'rb') as FWFile:
+                FWbuffer = FWfile.read()
+                if len(FWbuffer) == 33280:
+                    # bit of a hack to have the label display
+                    app.lowerRightLabel.set(("File Size Correct"))
+                try:
+                    update_firmware(dev, FWbuffer)
+                except FWUpdateLockedException:
+                    messagebox.showinfo('Error', 'Please enter Key before updating firmware')
+                    return
+                except ValueError:
+                    app.lowerRightLabel.set(("File Invalid"))
+                    return
+            messagebox.showinfo(
+                'Success!', 'Firmware update complete. App will now close.')
             exit()
-    if A == 0:
+    else:
         messagebox.showinfo(
             'Error', 'Please enter Key before updating firmware')
 
@@ -514,29 +503,24 @@ def main_updateFirmwareLegacy():
     FWfileName = askopenfilename(filetypes=(
         ("BennVenn Firmware File", "*.BEN"), ("All Files", "*.*")))
     if FWfileName:
-        FWfile = open(FWfileName, 'rb')
-        FWbuffer = FWfile.read()
-        FWsize = len(FWbuffer)
-        if FWsize == 33280:
-            dev.write(0x01, [0x03])
-            USBbuffer = dev.read(0x81, 64)
-            app.lowerRightLabel.set(("File Size Correct"))
-            for FWpos in range(512, 33279, 64):
-                dev.write(0x01, FWbuffer[FWpos:FWpos+64])
-        else:
-            app.lowerRightLabel.set(("File Invalid"))
-        FWfile.close()
+        with open(FWfileName, 'rb') as FWFile:
+            FWbuffer = FWfile.read()
+            if len(FWbuffer) == 33280:
+                # bit of a hack to have the label display
+                app.lowerRightLabel.set(("File Size Correct"))
+            try:
+                update_firmware(dev, FWbuffer, legacy=True)
+            except ValueError:
+                app.lowerRightLabel.set(("File Invalid"))
+                return
+        messagebox.showinfo(
+            'Success!', 'Firmware update complete. App fill now close.')
         exit()
 
 
 def main_CheckVersion():
-    dev.write(0x01, Command_Get_Version)
-    dat = dev.read(0x81, 64)
-    sdat = ""
-    for x in range(5):
-        sdat = sdat+chr(dat[x])
-    D = (SDID_Read())
-    app.lowerRightLabel.set(("Firmware "+sdat + " Device ID: " + D))
+    sdat, D = CheckVersion(dev)
+    app.lowerRightLabel.set(("Firmware " + sdat + " Device ID: " + D))
 
 
 # MBC Generic Specific Code Goes here:
@@ -2308,19 +2292,6 @@ def main_Catskull_write():
     return
 
 
-def SDID_Read():
-    dev.write(0x01, [0x80])
-    USBbuffer = dev.read(0x81, 64)
-    A = (USBbuffer[0]) + (USBbuffer[1] << 8) + \
-        (USBbuffer[2] << 16) + (USBbuffer[3] << 24)
-    B = (USBbuffer[4]) + (USBbuffer[5] << 8) + \
-        (USBbuffer[6] << 16) + (USBbuffer[7] << 24)
-    C = (USBbuffer[8]) + (USBbuffer[9] << 8) + \
-        (USBbuffer[10] << 16) + (USBbuffer[11] << 24)
-    D = str(hex(A))+","+str(hex(B))+","+str(hex(C))
-    return (D)
-
-
 def main_SendKey():
     myText = simpledialog.askstring("Update", "Enter Device Key:")
 
@@ -2347,11 +2318,6 @@ def main_SendKey():
         if A == 1:
             messagebox.showinfo('Success', 'Firmware Update Enabled')
 
-
-def Get_Key_State():
-    dev.write(0x01, [0x84])
-    USBbuffer = dev.read(0x81, 64)
-    return(USBbuffer[0])
 
 
 def SDID_Set():

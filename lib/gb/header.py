@@ -7,8 +7,11 @@ class GBHeader(Header):
     def __init__(self, raw):
         self.raw = raw
 
+    def get_title_raw(self):
+        return self.raw[0x34:0x43]
+
     def get_title(self):
-        return str(self.raw[0x34:0x43])
+        return str(self.get_title_raw(), 'utf-8')
 
     def get_rom_size(self):
         return (32768*(2**(self.raw[0x48])))

@@ -10,6 +10,8 @@ import usb.util
 #import sys
 #import itertools
 
+from lib.gb.generic import read_cart_header
+
 ROMsize = 0
 RAMsize = 0
 ROMbuffer = ""
@@ -404,30 +406,16 @@ def main_Header():
 
 
 def main_readCartHeader():
-    main_BV_SetBank(0, 0)
-    main_ROMBankSwitch(1)
-    RAMtypes = [0, 2048, 8192, 32768, (32768*4), (32768*2)]
     global ROMsize
     global RAMsize
-    Header = ""
-    dev.write(0x01, [0x10, 0x00, 0x00, 0x01, 0x00])  # start of logo
-    dat = dev.read(0x81, 64)
-    Header = dat
-    msg = [0x10, 0x00, 0x00, 0x01, 0x40]
-    dev.write(0x01, msg)
-    dat = dev.read(0x81, 64)
-    Header += dat
-    msg = [0x10, 0x00, 0x00, 0x01, 0x80]
-    dev.write(0x01, msg)
-    dat = dev.read(0x81, 64)
-    Header += dat  # Header contains 0xC0 bytes of header data
-    ROMsize = (32768*(2**(Header[0x48])))
-    app.ROMtitleLabel.set("ROM Title: "+str(Header[0x34:0x43], 'utf-8'))
-    app.ROMsizeLabel.set("ROM Size: "+str(32768*(2**(Header[0x48]))))
-    RAMsize = RAMtypes[Header[0x49]]
-    app.RAMsizeLabel.set("RAM Size:"+str(RAMsize))
-#    app.ROMregionLabel.set("Mapper: ?????????")
 
+    # TODO: run this stuff in a background thread
+    header = read_cart_header(dev)
+    ROMsize = header.get_rom_size()
+    RAMsize = header.get_ram_size()
+
+    app.ROMtitleLabel.set(f"ROM Title: {ROMsize}")
+    app.ROMsizeLabel.set(f"ROM Size: {RAMsize}")
 
 def main_Exit():
     exit()

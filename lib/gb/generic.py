@@ -1,5 +1,5 @@
 from .header import GBHeader
-from .common import BV_SetBank, ROMBankSwitch
+from .common import BV_SetBank, ROMBankSwitch, RAMBankSwitch
 
 # MBC code goes here...
 
@@ -43,3 +43,21 @@ def dump_rom(dev, ROMsize, BankSize, outfile):
             ROMbuffer = dev.read(0x81, 64)
             outfile.write(ROMbuffer)
             ROMaddress += 64
+
+
+def dump_ram(dev, RAMsize, BankSize):
+    RAMbuffer = []
+    num_banks = RAMsize // 8192
+    for bankNumber in range(num_banks):
+        RAMaddress = 0xA000
+        RAMBankSwitch(dev, bankNumber)
+        num_packets = 8192 // 64
+        for packetNumber in range(num_packets):
+            AddHi = RAMaddress >> 8
+            AddLo = RAMaddress & 0xFF
+            dev.write(0x01, [0x11, 0x00, 0x00, AddHi, AddLo])
+            USBbuffer = dev.read(0x81, 64)
+            RAMaddress += 64
+            RAMbuffer.append(USBbuffer)
+    # *actual* fastest way of doing it
+    return b''.join(RAMbuffer)

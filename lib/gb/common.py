@@ -17,3 +17,12 @@ def ROMBankSwitch(dev, bankNumber):
     USBbuffer = dev.read(0x81, 64)
     dev.write(0x01, [0x0A, 0x00, 0x01, 0x21, 0x00, blo])
     USBbuffer = dev.read(0x81, 64)
+
+
+def RAMBankSwitch(dev, bankNumber):
+    print("Bank:", bankNumber)
+    # Convert 16bit bank number to 2 x 8bit numbers
+    # Write to address defined under MBC settings to swap banks. This will change depending on certain cart types...
+    blo = bankNumber & 0xFF
+    dev.write(0x01, [0x0A, 0x00, 0x01, 0x40, 0x00, blo])
+    USBbuffer = dev.read(0x81, 64)

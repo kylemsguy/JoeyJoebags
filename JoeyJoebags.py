@@ -10,7 +10,7 @@ import usb.util
 #import sys
 #import itertools
 
-from lib.gb.generic import read_cart_header, dump_rom
+from lib.gb.generic import read_cart_header, dump_rom, dump_ram
 from lib.gb.sharkmx import dumpMXROM
 from lib.joey.firmware import *
 
@@ -1185,22 +1185,8 @@ def main_dumpMXROM():
 
 
 def main_dumpRAM():
-    global RAMsize
     global RAMbuffer
-    global USBbuffer
-    global BankSize
-    RAMbuffer = b''
-    for bankNumber in range(0, (int(RAMsize/8192))):
-        RAMaddress = 0xA000
-        main_RAMBankSwitch(bankNumber)
-        for packetNumber in range(0, int(8192/64)):
-            AddHi = RAMaddress >> 8
-            AddLo = RAMaddress & 0xFF
-            dev.write(0x01, [0x11, 0x00, 0x00, AddHi, AddLo])
-            USBbuffer = dev.read(0x81, 64)
-            RAMaddress += 64
-            # faster way of doing it
-            RAMbuffer = b''.join([RAMbuffer, USBbuffer])
+    RAMbuffer = dump_ram(dev, RAMsize, BankSize)
 
 
 def main_dumpRTC():

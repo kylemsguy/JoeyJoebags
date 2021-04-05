@@ -6,6 +6,7 @@ def BV_SetBank(dev, blk, sublk):  # 1-4:1-4
               0x01, 0xE0, 0x70, 0x02, blk])  # Lock flash block
     USBbuffer = dev.read(0x81, 64)
 
+
 def ROMBankSwitch(dev, bankNumber):
     # Convert 16bit bank number to 2 x 8bit numbers
     # Write to address defined under MBC settings to swap banks. This will change depending on certain cart types...

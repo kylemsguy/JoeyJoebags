@@ -11,6 +11,7 @@ import usb.util
 #import itertools
 
 from lib.gb.generic import read_cart_header, dump_rom
+from lib.gb.sharkmx import dumpMXROM
 from lib.joey.firmware import *
 
 ROMsize = 0
@@ -1175,28 +1176,11 @@ def main_dumpROM():
 
 
 def main_dumpMXROM():
-    global ROMbuffer
-    global USBbuffer
     ROMfileName = asksaveasfilename(filetypes=(
         ("GB ROM File", "*.GB"), ("GBC ROM File", "*.GBC"), ("GBA ROM File", "*.GBA"), ("All Files", "*.*")))
     if ROMfileName:
-        ROMfile = open(ROMfileName, 'wb')
-        for bankNumber in range(0, (int(ROMsize/BankSize))):
-            print('Dumping ROM:', int(bankNumber*BankSize), ' of ', ROMsize)
-            if bankNumber == 0:
-                # get bank 0 from address 0, not setbank(0) and get from high bank...
-                ROMaddress = 0
-            else:
-                ROMaddress = BankSize
-            main_MXROMBankSwitch(bankNumber)  # switch to new bank.
-            for packetNumber in range(0, (int(BankSize/64))):
-                AddHi = ROMaddress >> 8
-                AddLo = ROMaddress & 0xFF
-                dev.write(0x01, [0x10, 0x00, 0x00, AddHi, AddLo])
-                ROMbuffer = dev.read(0x81, 64)
-                ROMfile.write(ROMbuffer)
-                ROMaddress += 64
-        ROMfile.close()
+        with open(ROMfileName, 'wb') as ROMfile:
+            dumpMXROM(dev, ROMsize, BankSize, ROMfile)
         print('Done!')
 
 
